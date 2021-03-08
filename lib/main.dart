@@ -2,8 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:html_character_entities/html_character_entities.dart';
 import 'package:quiz/repositories/quiz_repository.dart';
 
@@ -17,11 +16,15 @@ void main() {
   runApp(MyApp());
 }
 
+
+final  pageControllerProvider = 
+  Provider<PageController>((ref) { return PageController(); });
+
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
-      child: MaterialApp(
+          child: MaterialApp(
         title: 'Flutter Riverpod Quiz',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
@@ -43,11 +46,15 @@ final quizQuestionsProvider = FutureProvider.autoDispose<List<Question>>(
       ),
 );
 
-class QuizScreen extends HookWidget {
+class QuizScreen extends ConsumerWidget {
+
   @override
-  Widget build(BuildContext context) {
-    final quizQuestions = useProvider(quizQuestionsProvider);
-    final pageController = usePageController();
+  Widget build(BuildContext context, ScopedReader watch) {
+
+    final quizQuestions = watch(quizQuestionsProvider);
+    
+    final pageController = watch(pageControllerProvider);
+
     return Container(
       height: MediaQuery.of(context).size.height,
       width: MediaQuery.of(context).size.width,
@@ -61,7 +68,7 @@ class QuizScreen extends HookWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: quizQuestions.when(
-          data: (questions) => _buildBody(context, pageController, questions),
+          data: (questions) => _buildBody(context, pageController, questions, watch),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => QuizError(
             message: error is Failure ? error.message : 'Something went wrong!',
@@ -69,7 +76,7 @@ class QuizScreen extends HookWidget {
         ),
         bottomSheet: quizQuestions.maybeWhen(
           data: (questions) {
-            final quizState = useProvider(quizControllerProvider.state);
+            final quizState = watch(quizControllerProvider.state);
             if (!quizState.answered) return const SizedBox.shrink();
             return CustomButton(
               title: pageController.page.toInt() + 1 < questions.length
@@ -98,10 +105,11 @@ class QuizScreen extends HookWidget {
     BuildContext context,
     PageController pageController,
     List<Question> questions,
+    ScopedReader watch
   ) {
     if (questions.isEmpty) return QuizError(message: 'No questions found.');
 
-    final quizState = useProvider(quizControllerProvider.state);
+    final quizState = watch(quizControllerProvider.state);
     return quizState.status == QuizStatus.complete
         ? QuizResults(state: quizState, questions: questions)
         : QuizQuestions(
